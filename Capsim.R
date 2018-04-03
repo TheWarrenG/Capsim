@@ -17,17 +17,41 @@ summarize <- function(pdf_string){
   
   teams <- c("Andrews", "Baldwin", "Chester", "Digby", "Erie", "Ferris")
   
-  numbers <- page_one %>%
+  numbers_string <- page_one %>%
     grep("[0-9]", ., value = TRUE)
   
   clean <- function(index, k = 1){
-    i_string <- numbers[index] %>%
+    negatives_vector <- numbers_string[index] %>%
+      strsplit(regex("[-(]")) %>%
+      unlist() %>%
+      gsub("[,$]", "", .)
+    
+    negatives <- numeric()
+    for (i in negatives_vector[-1]){
+      temp_negative_list <- strsplit(i, "[%)]") %>%
+      unlist() %>%
+      as.numeric()
+      negatives <- c(negatives, temp_negative_list[1])
+    }
+    
+    numbers <- numbers_string[index] %>%
       str_split(., boundary("word")) %>%
       unlist() %>%
       grep("[0-9]", ., value = TRUE) %>%
       gsub(",", "", .) %>%
       as.numeric()
-    return(i_string)
+    
+    counter <- 0
+    for (i in numbers){
+      counter <- counter + 1
+      for (j in negatives){
+        if (i == j){
+          numbers[counter] <- -i
+        }
+      }
+    }
+    
+    return(numbers)
   }
   
   ros <- clean(4)
@@ -103,6 +127,14 @@ get_scores <- function(summaries){
                      (roe_mean/max(roe_mean)) +
                      (final_profit[[1]]/max(final_profit[[1]])) +
                      (final_market_cap[[1]]/max(final_market_cap[[1]])))
+  
+  counter <- 0
+  for (score in scores){
+    counter <- counter + 1
+    if (score < 0){
+      scores[counter] <- 0
+    }
+  }
   return(scores)
 }
 
@@ -146,7 +178,7 @@ products <- function(pdf_title, c){
     return(stat_list)
   }
   
-  final = length(page_five) - 2
+  final = length(page) - 2
   names = character()
   performance = numeric()
   size = numeric()
@@ -179,4 +211,3 @@ products <- function(pdf_title, c){
   return(product_stats)
 }
 
-products("Round 2.PDF", "High")
