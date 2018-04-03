@@ -145,13 +145,6 @@ import_pdf <- function(pdf_title){
     return()
 }
 
-round_one_summary <- import_pdf("Round 1.PDF")
-round_two_summary <- import_pdf("Round 2.PDF")
-round_three_summary <- import_pdf("Round 3.PDF")
-round_four_summary <- import_pdf("Round 4.PDF")
-
-summaries <- list(round_one_summary, round_two_summary, round_three_summary, round_four_summary)
-
 products <- function(pdf_title, c){
   if (c == "Low"){
     n = 5
@@ -211,3 +204,13 @@ products <- function(pdf_title, c){
   return(product_stats)
 }
 
+round_four_high <- products("Round 4.PDF", "High")
+round_four_low <- products("Round 4.PDF", "Low")
+
+
+round_one_summary <- import_pdf("Round 1.PDF")
+round_two_summary <- import_pdf("Round 2.PDF")
+round_three_summary <- import_pdf("Round 3.PDF")
+round_four_summary <- import_pdf("Round 4.PDF")
+
+summaries <- list(round_one_summary, round_two_summary, round_three_summary, round_four_summary)
