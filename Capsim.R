@@ -204,6 +204,36 @@ products <- function(pdf_title, c){
   return(product_stats)
 }
 
+add_survey_scores <- function(pdf_title, new_product, product_table, market_segment){
+  if (market_segment == "Low"){
+    page_number <- 5
+    performance_and_size_index <- 13
+    price_range <- c(15, 35)
+    ideal_age <- 3
+    mtbf_range <- c(14000, 20000)
+  }
+  elif(market_segment == "High"){
+    page_number <- 6
+    performance_and_size_index <- 10
+    price_range <- c(25, 45)
+    ideal_age <- 0
+    mtbf_range <- c(17000, 23000)
+  }
+  
+  page <- pdf_text(pdf_title)[[page_number]] %>%
+    str_split('\n') %>%
+    unlist()
+  
+  performance_and_size <- page[performance_and_size_index] %>%
+    strsplit(., " ") %>% 
+    unlist() %>%
+    grep("[0-9]", ., value=TRUE) %>%
+    as.numeric()
+  
+  ideal_performance <- performance_and_size[2]
+  ideal_size <- performance_and_size[3]
+ }
+
 round_four_high <- products("Round 4.PDF", "High")
 round_four_low <- products("Round 4.PDF", "Low")
 
