@@ -204,19 +204,22 @@ products <- function(pdf_title, c){
   return(product_stats)
 }
 
-add_survey_scores <- function(pdf_title, new_product, product_table, market_segment){
+add_survey_scores <- function(pdf_title, new_product, market_segment){
+  #new_product is vector with elements price, performance, size, age, mtbf, awareness, accessibility in order
   if (market_segment == "Low"){
     page_number <- 5
     performance_and_size_index <- 13
     price_range <- c(15, 35)
     ideal_age <- 3
+    age_sd <- 2.2
     mtbf_range <- c(14000, 20000)
   }
-  elif(market_segment == "High"){
+  if (market_segment == "High"){
     page_number <- 6
     performance_and_size_index <- 10
     price_range <- c(25, 45)
     ideal_age <- 0
+    age_sd <- 1.9
     mtbf_range <- c(17000, 23000)
   }
   
@@ -232,6 +235,20 @@ add_survey_scores <- function(pdf_title, new_product, product_table, market_segm
   
   ideal_performance <- performance_and_size[2]
   ideal_size <- performance_and_size[3]
+  
+  price_score <- (price_range[2] - new_product[1]) * 99 / 20 + 1
+  performance_and_size_score <- (2.5 - sqrt((new_product[2] - ideal_performance) ^ 2 + (new_product[3] - ideal_size) ^ 2)) * 99 / 2.5 + 1
+  age_score <- dnorm(new_product[4], ideal_age, age_sd) * 99 / dnorm(ideal_age, ideal_age, age_sd) + 1
+  mtbf_score <- (new_product[5] - 14000) * 99 / 6000 + 1
+  
+  if (market_segment == "Low"){
+    base_score <- 0.41 * price_score + 0.29 * age_score + 0.21 * mtbf_score + 0.09 * performance_and_size_score
+  }
+  if (market_segment == "High"){
+    base_score <- 0.33 * performance_and_size_score + 0.29 * age_score + 0.25 * price_score + 0.13 * mtbf_score
+  }
+  adjusted_base_score <- (base_score/10) ^ 2
+  final_score = adjusted_base_score * (1 - (1-new_product[6])/2) * (1 - (1 - new_product[7])/2)
  }
 
 round_four_high <- products("Round 4.PDF", "High")
