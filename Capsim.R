@@ -20,7 +20,7 @@ summarize <- function(pdf_string){
   numbers_string <- page_one %>%
     grep("[0-9]", ., value = TRUE)
   
-  clean <- function(index, k = 1){
+  clean <- function(index){
     negatives_vector <- numbers_string[index] %>%
       strsplit(regex("[-(]")) %>%
       unlist() %>%
@@ -29,6 +29,8 @@ summarize <- function(pdf_string){
     negatives <- numeric()
     for (i in negatives_vector[-1]){
       temp_negative_list <- strsplit(i, "[%)]") %>%
+      unlist() %>%
+      strsplit(., " ") %>%
       unlist() %>%
       as.numeric()
       negatives <- c(negatives, temp_negative_list[1])
@@ -55,17 +57,17 @@ summarize <- function(pdf_string){
   }
   
   ros <- clean(4)
-  asset_turnover <- clean(5, 2)
+  asset_turnover <- clean(5)
   roa <- clean(6)
   leverage <- clean(7)
   roe <- clean(8)
-  emergency_loan <- clean(9, 2)
+  emergency_loan <- clean(9)
   sales <- clean(10)
   ebit <- clean(11)
   profits <- clean(12)
-  cumulative_profit <- clean(13, 2)
-  sga <- clean(14, 3)
-  contrib_margin <- clean(15, 2)
+  cumulative_profit <- clean(13)
+  sga <- clean(14)
+  contrib_margin <- clean(15)
   
   market_cap <- numeric()
   
@@ -204,6 +206,10 @@ products <- function(pdf_title, c){
   return(product_stats)
 }
 
+logit <- function(x){
+  return(log(x/(1-x)))
+}
+
 add_survey_scores <- function(pdf_title, new_product, market_segment){
   #new_product is vector with elements price, performance, size, age, mtbf, awareness, accessibility in order
   if (market_segment == "Low"){
@@ -236,10 +242,10 @@ add_survey_scores <- function(pdf_title, new_product, market_segment){
   ideal_performance <- performance_and_size[2]
   ideal_size <- performance_and_size[3]
   
-  price_score <- (price_range[2] - new_product[1]) * 99 / 20 + 1
-  performance_and_size_score <- (2.5 - sqrt((new_product[2] - ideal_performance) ^ 2 + (new_product[3] - ideal_size) ^ 2)) * 99 / 2.5 + 1
-  age_score <- dnorm(new_product[4], ideal_age, age_sd) * 99 / dnorm(ideal_age, ideal_age, age_sd) + 1
-  mtbf_score <- (new_product[5] - 14000) * 99 / 6000 + 1
+  price_score <- logit((price_range[2] - new_product[1]) / 20)
+  performance_and_size_score <- logit((2.5 - sqrt((new_product[2] - ideal_performance) ^ 2 + (new_product[3] - ideal_size) ^ 2)) / 2.5)
+  age_score <- logit(dnorm(new_product[4], ideal_age, age_sd) / dnorm(ideal_age, ideal_age, age_sd))
+  mtbf_score <- logit((new_product[5] - 14000) / 6000)
   
   if (market_segment == "Low"){
     base_score <- 0.41 * price_score + 0.29 * age_score + 0.21 * mtbf_score + 0.09 * performance_and_size_score
@@ -259,5 +265,8 @@ round_one_summary <- import_pdf("Round 1.PDF")
 round_two_summary <- import_pdf("Round 2.PDF")
 round_three_summary <- import_pdf("Round 3.PDF")
 round_four_summary <- import_pdf("Round 4.PDF")
+round_five_summary <- import_pdf("Round 5.PDF")
+round_six_summary <- import_pdf("Round 6.PDF")
 
-summaries <- list(round_one_summary, round_two_summary, round_three_summary, round_four_summary)
+summaries <- list(round_one_summary, round_two_summary, round_three_summary, round_four_summary, round_five_summary, round_six_summary)
+get_scores(summaries)
