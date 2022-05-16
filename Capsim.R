@@ -3,6 +3,7 @@ library(stringr)
 library(magrittr)
 library(dplyr)
 library(pdftools)
+library(ggplot2)
 
 summarize <- function(pdf_string){
   
@@ -17,31 +18,57 @@ summarize <- function(pdf_string){
   
   teams <- c("Andrews", "Baldwin", "Chester", "Digby", "Erie", "Ferris")
   
-  numbers <- page_one %>%
+  numbers_string <- page_one %>%
     grep("[0-9]", ., value = TRUE)
   
-  clean <- function(index, k = 1){
-    i_string <- numbers[index] %>%
+  clean <- function(index){
+    negatives_vector <- numbers_string[index] %>%
+      strsplit(regex("[-(]")) %>%
+      unlist() %>%
+      gsub("[,$]", "", .)
+    
+    negatives <- numeric()
+    for (i in negatives_vector[-1]){
+      temp_negative_list <- strsplit(i, "[%)]") %>%
+      unlist() %>%
+      strsplit(., " ") %>%
+      unlist() %>%
+      as.numeric()
+      negatives <- c(negatives, temp_negative_list[1])
+    }
+    
+    numbers <- numbers_string[index] %>%
       str_split(., boundary("word")) %>%
       unlist() %>%
       grep("[0-9]", ., value = TRUE) %>%
       gsub(",", "", .) %>%
       as.numeric()
-    return(i_string)
+    
+    counter <- 0
+    for (i in numbers){
+      counter <- counter + 1
+      for (j in negatives){
+        if (i == j){
+          numbers[counter] <- -i
+        }
+      }
+    }
+    
+    return(numbers)
   }
   
   ros <- clean(4)
-  asset_turnover <- clean(5, 2)
+  asset_turnover <- clean(5)
   roa <- clean(6)
   leverage <- clean(7)
   roe <- clean(8)
-  emergency_loan <- clean(9, 2)
+  emergency_loan <- clean(9)
   sales <- clean(10)
   ebit <- clean(11)
   profits <- clean(12)
-  cumulative_profit <- clean(13, 2)
-  sga <- clean(14, 3)
-  contrib_margin <- clean(15, 2)
+  cumulative_profit <- clean(13)
+  sga <- clean(14)
+  contrib_margin <- clean(15)
   
   market_cap <- numeric()
   
@@ -103,6 +130,14 @@ get_scores <- function(summaries){
                      (roe_mean/max(roe_mean)) +
                      (final_profit[[1]]/max(final_profit[[1]])) +
                      (final_market_cap[[1]]/max(final_market_cap[[1]])))
+  
+  counter <- 0
+  for (score in scores){
+    counter <- counter + 1
+    if (score < 0){
+      scores[counter] <- 0
+    }
+  }
   return(scores)
 }
 
@@ -112,13 +147,6 @@ import_pdf <- function(pdf_title){
     summarize() %>%
     return()
 }
-
-round_one_summary <- import_pdf("Round 1.PDF")
-round_two_summary <- import_pdf("Round 2.PDF")
-round_three_summary <- import_pdf("Round 3.PDF")
-round_four_summary <- import_pdf("Round 4.PDF")
-
-summaries <- list(round_one_summary, round_two_summary, round_three_summary, round_four_summary)
 
 products <- function(pdf_title, c){
   if (c == "Low"){
@@ -146,7 +174,7 @@ products <- function(pdf_title, c){
     return(stat_list)
   }
   
-  final = length(page_five) - 2
+  final = length(page) - 2
   names = character()
   performance = numeric()
   size = numeric()
@@ -155,6 +183,7 @@ products <- function(pdf_title, c){
   age = numeric()
   awareness = numeric()
   accessibility = numeric()
+  score = numeric()
   
   for (i in c(18:final)){
     names = c(names, separate(i)[1])
@@ -165,6 +194,7 @@ products <- function(pdf_title, c){
     age = c(age, numbers(i)[10])
     awareness = c(awareness, numbers(i)[12]/100)
     accessibility = c(accessibility, numbers(i)[14]/100)
+    score = c(score, numbers(i)[15])
   }
   
   product_stats <- data.frame("Names" = names,
@@ -174,9 +204,95 @@ products <- function(pdf_title, c){
                               "MTBF" = mtbf,
                               "Age" = age,
                               "Awareness" = awareness,
-                              "Accessibility" = accessibility)
+                              "Accessibility" = accessibility,
+                              "Score" = score)
   
   return(product_stats)
 }
 
-products("Round 2.PDF", "High")
+logit <- function(x){
+  return(log(x/(1-x)))
+}
+
+add_survey_scores <- function(pdf_title, new_product, market_segment){
+  #new_product is vector with elements price, performance, size, age, mtbf, awareness, accessibility in order
+  if (market_segment == "Low"){
+    page_number <- 5
+    performance_and_size_index <- 13
+    price_range <- c(15, 35)
+    ideal_age <- 3
+    age_sd <- 2.2
+    mtbf_range <- c(14000, 20000)
+  }
+  if (market_segment == "High"){
+    page_number <- 6
+    performance_and_size_index <- 10
+    price_range <- c(25, 45)
+    ideal_age <- 0
+    age_sd <- 1.9
+    mtbf_range <- c(17000, 23000)
+  }
+  
+  page <- pdf_text(pdf_title)[[page_number]] %>%
+    str_split('\n') %>%
+    unlist()
+  
+  performance_and_size <- page[performance_and_size_index] %>%
+    strsplit(., " ") %>% 
+    unlist() %>%
+    grep("[0-9]", ., value=TRUE) %>%
+    as.numeric()
+  
+  ideal_performance <- performance_and_size[2]
+  ideal_size <- performance_and_size[3]
+  
+  distance <- sqrt((new_product[2] - ideal_performance) ^ 2 + (new_product[3] - ideal_size) ^ 2)
+  if (distance <= sqrt(0.98)){
+    performance_and_size_score <- distance * -72.69993 + 100
+  }
+  
+  if (distance > sqrt(0.98) && distance < sqrt(5.12)){
+    performance_and_size_score <- distance *  -18.95345 + 46.7937 
+  }
+  
+  if (distance >= sqrt(5.12)){
+    performance_and_size_score <- distance * -12.25219 + 31.63049
+  }
+  
+  price_score <- (price_range[2] - new_product[1]) * 99 / 20 + 1
+  age_score <- dnorm(new_product[4], ideal_age, age_sd) * 99 / dnorm(ideal_age, ideal_age, age_sd) + 1
+  mtbf_score <- (new_product[5] - 14000) * 99 / 6000 + 1
+  
+  
+  if (market_segment == "Low"){
+    base_score <- 0.41 * price_score + 0.29 * age_score + 0.21 * mtbf_score + 0.09 * performance_and_size_score
+  }
+  if (market_segment == "High"){
+    base_score <- 0.33 * performance_and_size_score + 0.29 * age_score + 0.25 * price_score + 0.13 * mtbf_score
+  }
+  adjusted_base_score <- (base_score/10) ^ 2
+  final_score = adjusted_base_score * (1 - (1-new_product[6])/2) * (1 - (1 - new_product[7])/2)
+ }
+
+round_four_high <- products("Round 4.PDF", "High")
+round_four_low <- products("Round 4.PDF", "Low")
+round_six_low <- products("Round 6.PDF", "Low")
+round_six_high <- products("Round 6.PDF", "High")
+round_two_high <- products("Round 2.PDF", "High")
+round_two_low <- products("Round 2.PDF", "Low")
+
+round_one_summary <- import_pdf("Round 1.PDF")
+round_two_summary <- import_pdf("Round 2.PDF")
+round_three_summary <- import_pdf("Round 3.PDF")
+round_four_summary <- import_pdf("Round 4.PDF")
+round_five_summary <- import_pdf("Round 5.PDF")
+round_six_summary <- import_pdf("Round 6.PDF")
+round_seven_summary <- import_pdf("Round 7.PDF")
+summaries <- list(round_one_summary, round_two_summary, round_three_summary, round_four_summary, round_five_summary, round_six_summary, round_seven_summary)
+get_scores(summaries)
+
+ggplot(data = round_two_high, aes(x=Performance, y=Size, fill = Score)) +
+  geom_jitter(aes(colour = Score), alpha = .8, size = 2) +
+  labs(title = "Capsim Round 2 High-Tech Perceptual Map") +
+  xlim(0, 20) +
+  ylim(0, 20)
